@@ -11,7 +11,7 @@ import android.content.Intent;
 
 public class AppUpdatedReceiver extends BroadcastReceiver {
 
-	
+	@Override
 	public void onReceive(final Context context, final Intent intent) {
 		if (BuildConfig.DEBUG)
 			Logger.log("app updated");
