@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import util.Logger;
-import de.j4velin.pedometer.util.Util;
+import util.Util;
 
 public class Database extends SQLiteOpenHelper {
 
@@ -64,4 +64,63 @@ public class Database extends SQLiteOpenHelper {
         }
     }
 
-   
+   /**
+     * Query the 'steps' table. Remember to close the cursor!
+     *
+     * @param columns       the colums
+     * @param selection     the selection
+     * @param selectionArgs the selction arguments
+     * @param groupBy       the group by statement
+     * @param having        the having statement
+     * @param orderBy       the order by statement
+     * @return the cursor
+     */
+    public Cursor query(final String[] columns, final String selection,
+                        final String[] selectionArgs, final String groupBy, final String having,
+                        final String orderBy, final String limit) {
+        return getReadableDatabase()
+                .query(DB_NAME, columns, selection, selectionArgs, groupBy, having, orderBy, limit);
+    }
+
+    /**
+     * Inserts a new entry in the database, if there is no entry for the given
+     * date yet. Steps should be the current number of steps and it's negative
+     * value will be used as offset for the new date. Also adds 'steps' steps to
+     * the previous day, if there is an entry for that date.
+     * <p/>
+     * This method does nothing if there is already an entry for 'date' - use
+     * {@link #updateSteps} in this case.
+     * <p/>
+     * To restore data from a backup, use {@link #insertDayFromBackup}
+     *
+     * @param date  the date in ms since 1970
+     * @param steps the current step value to be used as negative offset for the
+     *              new day; must be >= 0
+     */
+    public void insertNewDay(long date, int steps) {
+        getWritableDatabase().beginTransaction();
+        try {
+            Cursor c = getReadableDatabase().query(DB_NAME, new String[]{"date"}, "date = ?",
+                    new String[]{String.valueOf(date)}, null, null, null);
+            if (c.getCount() == 0 && steps >= 0) {
+
+                // add 'steps' to yesterdays count
+                addToLastEntry(steps);
+
+                // add today
+                ContentValues values = new ContentValues();
+                values.put("date", date);
+                // use the negative steps as offset
+                values.put("steps", -steps);
+                getWritableDatabase().insert(DB_NAME, null, values);
+            }
+            c.close();
+            if (BuildConfig.DEBUG) {
+                Logger.log("insertDay " + date + " / " + steps);
+                logState();
+            }
+            getWritableDatabase().setTransactionSuccessful();
+        } finally {
+            getWritableDatabase().endTransaction();
+        }
+    }
